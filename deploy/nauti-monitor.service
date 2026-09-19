@@ -1,0 +1,20 @@
+[Unit]
+Description=Nauti-Monitor Hardware and Lemonade Telemetry Daemon
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cesarops
+Group=cesarops
+WorkingDirectory=/codebase/repos/Nauti-Monitor
+ExecStart=/codebase/repos/Nauti-Monitor/target/release/nauti-daemon --bind 127.0.0.1:9100 --lemonade-url http://127.0.0.1:13305 --node-name cesarops-3 --scrape-interval 1 --history-capacity 120
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+AmbientCapabilities=
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[package]
+name = "nauti-ui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dioxus = { version = "0.6", features = ["web"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+gloo-net = "0.6"
+gloo-timers = { version = "0.3", features = ["futures"] }
+wasm-bindgen-futures = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
