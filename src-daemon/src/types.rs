@@ -83,7 +83,11 @@ pub struct GpuStats {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LemonadeContext {
     pub healthy: bool,
+    /// Models currently loaded (from /api/v1/health all_models_loaded).
     pub active_models: Vec<String>,
+    /// Models downloaded/available (from /v1/models); not necessarily loaded.
+    #[serde(default)]
+    pub downloaded_models: Vec<String>,
     pub tokens_per_sec: Option<f32>,
     pub context_tokens: Option<u32>,
     pub backend: Option<String>,

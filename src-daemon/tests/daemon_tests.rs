@@ -47,11 +47,13 @@ async fn test_mcp_handler_tools() {
         vram_total: 8589934592,
         temp_celsius: Some(48.0),
         power_watts: Some(65.0),
+        model: None,
     });
 
     sample.lemonade = LemonadeContext {
         healthy: true,
         active_models: vec!["Qwen3-14B-GGUF".to_string()],
+        downloaded_models: vec!["Qwen3-14B-GGUF".to_string()],
         tokens_per_sec: Some(24.5),
         context_tokens: Some(8192),
         backend: Some("Vulkan".to_string()),
