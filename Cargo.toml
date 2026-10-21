@@ -3,4 +3,5 @@ resolver = "2"
 members = [
     "src-daemon",
     "src-ui",
+    "src-fleet",
 ]

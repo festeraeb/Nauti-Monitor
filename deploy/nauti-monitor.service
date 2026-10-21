@@ -1,20 +1,30 @@
+# Nauti-Monitor — canonical fleet telemetry collector (all-Rust, single source of truth)
+#
+# Installs on every node. Binds 127.0.0.1 ONLY: the fleet aggregator on t440
+# polls this endpoint; nothing should reach it directly from the LAN.
+#
+# NOTE: the historical deploy/nauti-monitor.service in this repo bound :9100,
+# which collides with Forge on t440. Ports are per-node; 9100 is Forge.
+# Endpoints: /api/telemetry  /api/telemetry/history  /health  /mcp
 [Unit]
 Description=Nauti-Monitor Hardware and Lemonade Telemetry Daemon
-After=network.target
+After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=cesarops
 Group=cesarops
-WorkingDirectory=/codebase/repos/Nauti-Monitor
-ExecStart=/codebase/repos/Nauti-Monitor/target/release/nauti-daemon --bind 127.0.0.1:9100 --lemonade-url http://127.0.0.1:13305 --node-name cesarops-3 --scrape-interval 1 --history-capacity 120
+ExecStart=/codebase/repos/forge_lemon-cake/nauti-monitor/target/release/nauti-daemon \
+  --bind 127.0.0.1:9121 \
+  --node-name t440 \
+  --lemonade-url http://127.0.0.1:13305 \
+  --scrape-interval 1 \
+  --history-capacity 120
 Restart=always
 RestartSec=3
 StandardOutput=journal
 StandardError=journal
-AmbientCapabilities=
-CapabilityBoundingSet=
 
 [Install]
 WantedBy=multi-user.target

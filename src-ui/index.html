@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nauti Fleet — Telemetry</title>
+<meta name="description" content="CESARops fleet telemetry: accelerators, VRAM, thermals across every node." />
+<style>
+  /* Boot shell — replaced by the WASM app the moment it mounts.
+     Inline so there is no flash of unstyled nothing while the 1.1 MB
+     module downloads. Painted dark to match both themes. */
+  /* overflow must NOT stay hidden: the app is content-driven (min-height:100vh)
+     and on short viewports the node cards extend past the fold. #boot is
+     position:fixed inset:0, so it covers the viewport without this. */
+  html, body { margin: 0; background: #0b0906; height: 100%; overflow: auto; }
+  #boot {
+    position: fixed; inset: 0; display: grid; place-content: center; gap: 18px;
+    font: 700 11px/1.6 ui-monospace, "JetBrains Mono", Menlo, monospace;
+    color: #d99422; letter-spacing: .34em; text-align: center;
+    transition: opacity .4s ease;
+  }
+  #boot.gone { opacity: 0; pointer-events: none; }
+  #ring {
+    width: 62px; height: 62px; margin: 0 auto; border-radius: 50%;
+    border: 2px solid rgba(217,148,34,.20); border-top-color: #d99422;
+    animation: sp 0.9s linear infinite;
+  }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #err { color: #ff2d78; letter-spacing: .12em; font-weight: 600; max-width: 60ch; }
+</style>
+</head>
+<body>
+<div id="boot">
+  <div id="ring"></div>
+  <div id="msg">NAUTI FLEET // ACQUIRING TELEMETRY STREAM</div>
+  <div id="err"></div>
+</div>
+
+<!-- Dioxus mounts here. dioxus-web looks for #main specifically; without it
+     the launch path warns "#main not found, mounting to the body" and paints
+     nothing, which is exactly the blank-screen bug this element fixes. -->
+<main id="main"></main>
+
+<script type="module">
+  // The WASM app is served by nauti-fleet from the same origin as this page.
+  // MUST be a RELATIVE path: this page is served both at / (nauti-fleet
+  // direct) and at /dash/ (cesarops.com via nginx). An absolute "/nfui/..."
+  // 404s under /dash/ -- and worse, nginx's SPA try_files hands back the
+  // site index.html as text/html, so the module import dies with a MIME error
+  // instead of a clean 404. Relative resolves correctly in both deployments.
+  // /dash/api/fleet/telemetry is proxied to nauti-fleet :9122 (see
+  // snippets/cesarops-nauti-monitor.conf); it is namespaced because the bare
+  // /api/fleet/ prefix already belongs to wrecks-api.
+  import init from "./nfui/nauti_ui.js";
+
+  const boot = document.getElementById("boot");
+  const err = document.getElementById("err");
+
+  try {
+    await init();
+    // Dioxus takes over <body>; drop the boot shell once it has painted.
+    setTimeout(() => boot.classList.add("gone"), 220);
+  } catch (e) {
+    document.getElementById("ring").style.display = "none";
+    document.getElementById("msg").textContent = "NAUTI FLEET // UNABLE TO START";
+    err.textContent = String(e);
+    console.error(e);
+  }
+</script>
+</body>
+</html>
