@@ -21,9 +21,34 @@ fn note(ctx: &mut LemonadeContext, reason: String) {
     }
 }
 
+/// Extract the llamacpp backend from a loaded entry's `launch_command`.
+/// Uses the first element (server executable path), splits on '/' and '\\',
+/// and returns the segment following a "llamacpp" segment when it is one of
+/// vulkan/rocm/cpu/cuda/metal (lowercased); otherwise None.
+fn backend_from_launch_command(entry: &Value) -> Option<String> {
+    let exe = entry.get("launch_command")
+        .and_then(|v| v.as_array())
+        .and_then(|a| a.first())
+        .and_then(|v| v.as_str());
+    if exe.is_none() {
+        return None;
+    }
+    let exe = exe.unwrap();
+    let mut prev = "";
+    for seg in exe.split(|c| c == '/' || c == '\\') {
+        let lower = seg.to_lowercase();
+        if prev == "llamacpp" && (lower == "vulkan" || lower == "rocm" || lower == "cpu" || lower == "cuda" || lower == "metal") {
+            return Some(lower);
+        }
+        prev = seg;
+    }
+    None
+}
+
 /// Parse GET /api/v1/health (Lemonade 11.9.0 shape). `healthy` is set only from
 /// `status == "ok"`. The loaded model comes from `model_loaded` / `all_models_loaded[]`;
-/// backend and context size come from that entry's `recipe_options`.
+/// backend comes from `recipe_options.llamacpp_backend` when present, otherwise from
+/// `launch_command`; context size comes from `recipe_options.ctx_size`.
 pub fn apply_health(ctx: &mut LemonadeContext, json: &Value) {
     match json.get("status").and_then(|s| s.as_str()) {
         Some("ok") => ctx.healthy = true,
@@ -65,9 +90,14 @@ pub fn apply_health(ctx: &mut LemonadeContext, json: &Value) {
         }
     };
     let opts = entry.get("recipe_options");
-    match opts.and_then(|o| o.get("llamacpp_backend")).and_then(|b| b.as_str()) {
-        Some(b) => ctx.backend = Some(b.to_string()),
-        None => note(ctx, "loaded model has no recipe_options.llamacpp_backend; backend null".to_string()),
+    let backend = opts
+        .and_then(|o| o.get("llamacpp_backend"))
+        .and_then(|b| b.as_str())
+        .map(|b| b.to_string())
+        .or_else(|| backend_from_launch_command(entry));
+    match backend {
+        Some(b) => ctx.backend = Some(b),
+        None => note(ctx, "no recipe_options.llamacpp_backend and no backend in launch_command; backend null".to_string()),
     }
     match opts.and_then(|o| o.get("ctx_size")).and_then(|c| c.as_u64()).map(u32::try_from) {
         Some(Ok(c)) => ctx.context_tokens = Some(c),
@@ -196,5 +226,83 @@ mod tests {
         assert!(!ctx.healthy);
         assert!(ctx.active_models.is_empty());
         assert!(ctx.raw_notes.unwrap().contains("starting"));
+    }
+
+    #[test]
+    fn backend_from_launch_command_live_entry() {
+        let mut ctx = LemonadeContext::default();
+        apply_health(
+            &mut ctx,
+            &serde_json::json!({
+                "status": "ok",
+                "all_models_loaded": [{
+                    "model_name": "cesarops3",
+                    "launch_command": [
+                        "/home/cesarops/iced-lemcake/cache/bin/llamacpp/vulkan/llama-server",
+                        "-m",
+                        "/m.gguf",
+                        "--ctx-size",
+                        "4096"
+                    ],
+                    "recipe_options": {
+                        "ctx_size": 4096,
+                        "llamacpp_args": "--parallel 1"
+                    }
+                }],
+                "model_loaded": "cesarops3"
+            }),
+        );
+        assert_eq!(ctx.backend.as_deref(), Some("vulkan"));
+        assert_eq!(ctx.context_tokens, Some(4096));
+    }
+
+    #[test]
+    fn backend_from_launch_command_windows_path() {
+        let mut ctx = LemonadeContext::default();
+        apply_health(
+            &mut ctx,
+            &serde_json::json!({
+                "status": "ok",
+                "all_models_loaded": [{
+                    "model_name": "m",
+                    "launch_command": ["C:\\Users\\x\\lemonade\\bin\\llamacpp\\rocm\\llama-server.exe"]
+                }],
+                "model_loaded": "m"
+            }),
+        );
+        assert_eq!(ctx.backend.as_deref(), Some("rocm"));
+    }
+
+    #[test]
+    fn explicit_backend_wins_over_launch_command() {
+        let mut ctx = LemonadeContext::default();
+        apply_health(
+            &mut ctx,
+            &serde_json::json!({
+                "status": "ok",
+                "all_models_loaded": [{
+                    "model_name": "m",
+                    "launch_command": ["/bin/llamacpp/vulkan/llama-server"],
+                    "recipe_options": {"llamacpp_backend": "cpu"}
+                }],
+                "model_loaded": "m"
+            }),
+        );
+        assert_eq!(ctx.backend.as_deref(), Some("cpu"));
+    }
+
+    #[test]
+    fn backend_absent_notes_launch_command() {
+        let mut ctx = LemonadeContext::default();
+        apply_health(
+            &mut ctx,
+            &serde_json::json!({
+                "status": "ok",
+                "all_models_loaded": [{"model_name": "m"}],
+                "model_loaded": "m"
+            }),
+        );
+        assert!(ctx.backend.is_none());
+        assert!(ctx.raw_notes.unwrap().contains("launch_command"));
     }
 }
