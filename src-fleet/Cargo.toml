@@ -1,5 +1,6 @@
 [package]
 name = "nauti-fleet"
+license = "Apache-2.0"
 version = "0.1.0"
 edition = "2021"
 description = "Fleet-wide telemetry aggregator. Polls every node's nauti-daemon /api/telemetry and exposes one canonical fleet view plus an MCP surface for agents."
