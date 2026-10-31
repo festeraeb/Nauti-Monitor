@@ -1,6 +1,10 @@
+mod bmc_scraper;
 mod cache;
 mod lemonade;
+mod mail_scraper;
 mod mcp;
+mod model_scraper;
+mod llama_scraper;
 mod scraper;
 mod types;
 
@@ -150,7 +154,9 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/health", get(health_handler))
+        .route("/telemetry", get(telemetry_handler))
         .route("/api/telemetry", get(telemetry_handler))
+        .route("/history", get(history_handler))
         .route("/api/telemetry/history", get(history_handler))
         .route("/mcp", post(mcp_http_handler))
         .layer(cors)
@@ -199,6 +205,10 @@ async fn run_scraper_loop(
 
 async fn health_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let uptime = state.start_time.elapsed().as_secs();
+    let snap = state.cache.snapshot().await;
+    let mail_reachable = snap.mail_health.smtp_online;
+    let bmc_detected = snap.bmc_health.as_ref().map(|b| b.bmc_detected).unwrap_or(false);
+
     let health = DaemonHealth {
         status: "ok".to_string(),
         uptime_secs: uptime,
@@ -206,6 +216,8 @@ async fn health_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse
         all_smi_ok: state.all_smi_ok.load(Ordering::Relaxed),
         polaris_fallback_active: state.polaris_fallback_active.load(Ordering::Relaxed),
         lemonade_reachable: state.lemonade_reachable.load(Ordering::Relaxed),
+        mail_reachable,
+        bmc_detected,
     };
     (StatusCode::OK, Json(health))
 }

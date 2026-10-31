@@ -1,0 +1,33 @@
+# nauti-fleet — the ONE canonical fleet telemetry endpoint.
+#
+# Aggregates every node's nauti-daemon (/api/telemetry + /health on :9121) into
+# a single fleet view plus an MCP surface for agents.
+#
+# This replaces the ad-hoc GPU inventory in: proxy.py :8767, fleet-worker's
+# nvidia-smi/sysfs/lspci layers, and direct `all-smi snapshot` callers.
+# fleet-hq :7700 is intentionally KEPT for node identity/enrollment and for
+# generating ~/.ssh/config — it is no longer a telemetry source.
+#
+# Binds 127.0.0.1. Put a reverse proxy in front if the webpage needs LAN access.
+[Unit]
+Description=Nauti-Fleet Telemetry Aggregator (single source of truth)
+After=network-online.target nauti-daemon.service
+Wants=network-online.target nauti-daemon.service
+
+[Service]
+Type=simple
+User=cesarops
+Group=cesarops
+Environment=RUST_LOG=info
+# name=host[:port] — comma separated. Add/remove nodes here, not in code.
+Environment=NAUTI_FLEET_NODES=t440=127.0.0.1:9121,cesarops2=127.0.0.1:19221,cesarops3=127.0.0.1:19222,cesarops4om=127.0.0.1:19223
+Environment=NAUTI_FLEET_REFRESH_SECS=5
+Environment=NAUTI_FLEET_TIMEOUT_SECS=4
+ExecStart=/usr/local/bin/nauti-fleet --bind 127.0.0.1 --port 9122 --allow-remote
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

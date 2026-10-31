@@ -1,5 +1,9 @@
+pub mod bmc_scraper;
 pub mod cache;
 pub mod lemonade;
+pub mod mail_scraper;
 pub mod mcp;
+pub mod model_scraper;
+pub mod llama_scraper;
 pub mod scraper;
 pub mod types;
